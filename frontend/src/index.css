@@ -237,6 +237,15 @@ h1, h2, h3, p { margin: 0; }
 .check input { accent-color: var(--green); width: 16px; height: 16px; }
 .tpl { margin: 0 0 0 14px; }
 .file-name { margin-left: 12px; font-size: 13px; }
-.error-text { color: var(--red); font-size: 13px; margin-top: 10px; }
+.error-text { color: var(--red); font-size: 13px; margin-top: 10px; white-space: pre-line; }
+.label-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 18px 0 10px; }
+.label-row .label { margin: 0; }
+.label-row .tpl { margin: 0; }
+.btn.sm { padding: 6px 12px; font-size: 12px; }
+.check .tag { font-size: 11px; font-weight: 600; color: var(--green-dark); background: var(--green-soft); border-radius: 999px; padding: 2px 8px; }
+.chip-x { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); }
+.chip-x:hover { background: var(--line); color: var(--red); }
+.rule-hint { margin-top: 12px; font-size: 12.5px; }
+.rule-hint code { background: var(--green-soft); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
 .impact.pending { background: #eef1ef; color: var(--muted); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }

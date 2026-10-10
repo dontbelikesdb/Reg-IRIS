@@ -122,11 +122,20 @@ def _label(op: str, children: list[Trace]) -> str:
 
 # ---------- static checks (used by the rule loader) -----------------------
 
-def validate_logic(logic: Any, path: str = "logic") -> None:
+MAX_LOGIC_DEPTH = 32
+MAX_REGEX_LENGTH = 300
+
+# Nested quantifiers such as (a+)+ or (\d*)* are the classic catastrophic-backtracking shape.
+_NESTED_QUANTIFIER = re.compile(r"\([^()]*[+*][^()]*\)\s*(?:[+*]|\{\d+,\d*\})")
+
+
+def validate_logic(logic: Any, path: str = "logic", _depth: int = 0) -> None:
     """Raise ValueError if the logic uses an unsupported operator or bad shape."""
+    if _depth > MAX_LOGIC_DEPTH:
+        raise ValueError(f"{path}: logic is nested more than {MAX_LOGIC_DEPTH} levels deep")
     if isinstance(logic, list):
         for i, item in enumerate(logic):
-            validate_logic(item, f"{path}[{i}]")
+            validate_logic(item, f"{path}[{i}]", _depth + 1)
         return
     if not isinstance(logic, dict):
         return
@@ -136,8 +145,39 @@ def validate_logic(logic: Any, path: str = "logic") -> None:
     if op not in SUPPORTED_OPERATORS:
         raise ValueError(f"{path}: unsupported operator '{op}'")
     if op != "var":
-        validate_logic(args, f"{path}.{op}")
+        validate_logic(args, f"{path}.{op}", _depth + 1)
 
+
+def validate_regexes(logic: Any, path: str = "logic") -> None:
+    """Stricter check for user-uploaded rule files (not run for the built-in files)."""
+    if isinstance(logic, list):
+        for i, item in enumerate(logic):
+            validate_regexes(item, f"{path}[{i}]")
+        return
+    if not isinstance(logic, dict):
+        return
+    for op, raw in logic.items():
+        if op == "var":
+            continue
+        args = raw if isinstance(raw, list) else [raw]
+        if op == "regex":
+            if len(args) != 2 or not isinstance(args[1], str):
+                raise ValueError(f'{path}.regex: expected [field, "pattern"] with a text pattern')
+            pattern = args[1]
+            if len(pattern) > MAX_REGEX_LENGTH:
+                raise ValueError(f"{path}.regex: pattern is longer than {MAX_REGEX_LENGTH} characters")
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise ValueError(f"{path}.regex: invalid pattern '{pattern}': {exc}") from exc
+            if _NESTED_QUANTIFIER.search(pattern):
+                raise ValueError(
+                    f"{path}.regex: pattern '{pattern}' has nested quantifiers and could be very slow; "
+                    "please simplify it"
+                )
+            args = args[:1]  # the field name is not logic
+        for i, a in enumerate(args):
+            validate_regexes(a, f"{path}.{op}[{i}]")
 
 def extract_fields(logic: Any) -> set[str]:
     """Every data field a piece of logic reads."""

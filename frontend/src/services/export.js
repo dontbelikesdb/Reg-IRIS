@@ -6,3 +6,9 @@ export function downloadCsv(filename, headers, rows) {
   a.click();
   URL.revokeObjectURL(url);
 }
+export function downloadJson(filename, data) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+  a.click();
+  URL.revokeObjectURL(url);
+}

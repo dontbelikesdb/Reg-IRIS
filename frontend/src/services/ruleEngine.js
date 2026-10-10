@@ -28,11 +28,22 @@ export async function fetchRegulators() {
   return (await res.json()).regulators;
 }
 
+// Checks a user-supplied rules_<name>.json without saving it.
+// Resolves to the same shape as one fetchRegulators() entry; rejects with a readable message.
+export async function validateRuleFile(file) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await request("/api/regulators/validate", { method: "POST", body: form });
+  return res.json();
+}
+
 // Uploads the trades CSV and returns the full report (summary, rules_checked, results).
-export async function checkTrades(file, regulatorIds) {
+// regulatorIds: built-in regulators. ruleFiles: user-supplied rules_<name>.json File objects.
+export async function checkTrades(file, regulatorIds, ruleFiles = []) {
   const form = new FormData();
   form.append("file", file);
   regulatorIds.forEach((id) => form.append("regulators", id));
+  ruleFiles.forEach((f) => form.append("rule_files", f));
   const res = await request("/api/impact/check", { method: "POST", body: form });
   return res.json();
 }
