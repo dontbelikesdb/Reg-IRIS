@@ -5,8 +5,9 @@ from collections import Counter
 
 from app.schemas.impact import (
     ImpactReport, RegulatorSummary, ReportSummary, RuleFailureCount,
-    RuleViolation, TradeResult,
+    RuleViolation, TradeResult, RuleRef
 )
+
 from app.schemas.internal import Rule, RuleSet
 from app.services.impact.trade_loader import ParsedTrades, Trade
 from app.services.rules.explanation_builder import explain_failure
@@ -48,6 +49,7 @@ def evaluate_trade(trade: Trade, rulesets: list[RuleSet]) -> TradeResult:
 
     return TradeResult(
         row_number=trade.row_number,
+        trade_id=trade.raw.get("Trade_ID") or f"ROW-{trade.row_number}",
         status="FAIL" if violations else "PASS",
         trade=trade.raw,
         regulator_status=regulator_status,
@@ -107,6 +109,11 @@ def build_report(parsed: ParsedTrades, rulesets: list[RuleSet]) -> ImpactReport:
         ),
         columns=parsed.columns,
         regulators_checked=[rs.id for rs in rulesets],
+        rules_checked=[                                                    # <- new
+            RuleRef(regulator_id=rs.id, rule_id=r.id, description=r.description)
+            for rs in rulesets
+            for r in rs.rules
+        ],
         warnings=_missing_column_warnings(parsed.columns, rulesets),
         results=results,
     )

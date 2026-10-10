@@ -5,6 +5,14 @@ from pydantic import BaseModel, Field
 from app.schemas.common import Status
 
 
+class RuleRef(BaseModel):
+    """One rule that was checked: becomes one column of the Impact Matrix."""
+
+    regulator_id: str
+    rule_id: str
+    description: str
+
+
 class RuleViolation(BaseModel):
     regulator_id: str
     regulator: str
@@ -17,6 +25,7 @@ class RuleViolation(BaseModel):
 
 class TradeResult(BaseModel):
     row_number: int  # row in the CSV file (header = row 1)
+    trade_id: str  # Trade_ID from the CSV, or ROW-<n> if there is no such column
     status: Status
     trade: dict[str, str | None]  # original values, normalized column names
     regulator_status: dict[str, Status]
@@ -51,5 +60,6 @@ class ImpactReport(BaseModel):
     summary: ReportSummary
     columns: list[str]
     regulators_checked: list[str]
+    rules_checked: list[RuleRef] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     results: list[TradeResult]
