@@ -1,0 +1,106 @@
+# =====================================================================
+# 1. Environment & Secrets (Never commit credentials)
+# =====================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# =====================================================================
+# 2. Operating System Files
+# =====================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# =====================================================================
+# 3. IDE & Editor Specific
+# =====================================================================
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.code-workspace
+
+# JetBrains (IntelliJ IDEA, PyCharm, WebStorm)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.metadata
+.classpath
+.project
+.settings/
+
+# =====================================================================
+# 4. Java / Spring Boot (ingestion-service)
+# =====================================================================
+ingestion-service/target/
+ingestion-service/**/*.class
+ingestion-service/**/*.jar
+ingestion-service/**/*.war
+ingestion-service/.mvn/timing.properties
+ingestion-service/.mvn/wrapper/maven-wrapper.jar
+
+# =====================================================================
+# 5. Python / FastAPI (core-api-service)
+# =====================================================================
+core-api-service/**/__pycache__/
+core-api-service/**/*.py[cod]
+core-api-service/**/$py.class
+core-api-service/.pytest_cache/
+core-api-service/.coverage
+core-api-service/htmlcov/
+core-api-service/.mypy_cache/
+core-api-service/.ruff_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+core-api-service/venv/
+core-api-service/.venv/
+
+# ChromaDB / Vector Store local persistence
+core-api-service/chroma_db/
+core-api-service/.chromadb/
+chroma_data/
+
+# =====================================================================
+# 6. Frontend / Node / React (frontend)
+# =====================================================================
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+
+# npm / yarn / pnpm debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =====================================================================
+# 7. Databases, Docker Mounts & Storage
+# =====================================================================
+pgdata/
+esdata/
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary runtime uploads (keeps original seed datasets intact)
+data/uploads/
+data/temp/
+temp/
+tmp/
+*.log
