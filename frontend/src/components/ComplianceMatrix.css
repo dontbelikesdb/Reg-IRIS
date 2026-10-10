@@ -14,21 +14,17 @@
 
 .mx-sort { cursor: pointer; user-select: none; }
 .mx-sort svg { vertical-align: -2px; margin-left: 4px; }
-.mx-rule-head { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 
 .mx-trade { font-weight: 600; }
 .mx-spacer { display: inline-block; width: 16px; }
 .mx-trade svg { vertical-align: -3px; margin-right: 2px; color: var(--muted); }
-.mx-row.clickable { cursor: pointer; }
-.mx-row.clickable:hover td { background: #fafcfb; }
 .mx-cell.fail { color: var(--red); font-weight: 600; }
 .mx-pill { min-width: 54px; text-align: center; letter-spacing: .4px; }
 
-.mx-detail td { background: #fafcfb; white-space: normal; padding: 14px 16px 16px 34px; }
-.mx-detail ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
-.mx-detail li { border-left: 3px solid var(--red); padding-left: 12px; font-size: 13px; line-height: 1.5; }
-.mx-detail .why { font-weight: 600; }
-.mx-detail .sub { color: var(--muted); font-size: 12px; }
+  .mx-violations { white-space: normal; min-width: 130px; }
+  .mx-rule-pill { margin: 0 6px 4px 0; }
+  .mx-explain { white-space: normal; min-width: 340px; font-size: 13px; line-height: 1.5; }
+  .mx-explain p + p { margin-top: 6px; }
 
 .mx-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--muted); }
 .mx-pager-btns { display: flex; align-items: center; gap: 8px; }

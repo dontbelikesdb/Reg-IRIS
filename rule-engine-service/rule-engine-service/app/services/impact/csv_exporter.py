@@ -1,7 +1,6 @@
 """Flattens an ImpactReport into the Impact Matrix CSV (one line per trade).
 
-Layout:  Trade_ID | Row | <one Pass/Fail column per rule> | Overall_Status |
-         Failed_Rules | Violation_Details | <the rest of the original trade fields>
+Layout:  Trade_ID | <one Pass/Fail column per selected regulator> | Violations | Impact_Explanation
 """
 from __future__ import annotations
 
@@ -30,30 +29,23 @@ def _safe(value: str | None) -> str:
     return value
 
 
+def regulator_columns(report: ImpactReport) -> list[tuple[str, str]]:
+    """(regulator_id, display name) for each selected regulator, in the order checked."""
+    names = {s.regulator_id: s.name for s in report.summary.by_regulator}
+    return [(rid, names.get(rid, rid)) for rid in report.regulators_checked]
+
+
 def report_to_csv(report: ImpactReport, bom: bool = True) -> str:
     buffer = io.StringIO()
-    writer = csv.writer(buffer, lineterminator="\r\n")  # csv module handles quoting/escaping
+    writer = csv.writer(buffer, lineterminator="\r\n")
 
-    rules = report.rules_checked
-    other_columns = [c for c in report.columns if c != "Trade_ID"]
-    writer.writerow([
-        "Trade_ID", "Row", *(r.rule_id for r in rules),
-        "Overall_Status", "Failed_Rules", "Violation_Details", *other_columns,
-    ])
+    regulators = regulator_columns(report)
+    writer.writerow(["Trade_ID", *(name for _, name in regulators), "Violations", "Impact_Explanation"])
 
     for r in report.results:
-        failed = {(v.regulator_id, v.rule_id) for v in r.violations}
-        cells = ["Fail" if (rr.regulator_id, rr.rule_id) in failed else "Pass" for rr in rules]
-        failed_rules = "; ".join(f"{v.regulator_id}:{v.rule_id}" for v in r.violations)
-        details = " | ".join(f"[{v.rule_id}] {v.explanation}" for v in r.violations)
-        writer.writerow([
-            _safe(r.trade_id),
-            r.row_number,
-            *cells,
-            r.status,
-            failed_rules,
-            details,
-            *(_safe(r.trade.get(c)) for c in other_columns),
-        ])
+        statuses = [("Pass" if r.regulator_status.get(rid) == "PASS" else "Fail") for rid, _ in regulators]
+        violations = "; ".join(v.rule_id for v in r.violations)
+        explanation = " | ".join(f"[{v.rule_id}] {v.explanation}" for v in r.violations)
+        writer.writerow([_safe(r.trade_id), *statuses, violations, explanation])
 
     return ("\ufeff" if bom else "") + buffer.getvalue()  # BOM so Excel reads UTF-8

@@ -1,49 +1,34 @@
-import { Fragment, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ChevronUp, Download } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, Download } from "lucide-react";
 import "./ComplianceMatrix.css";
 
 const PAGE_SIZE = 25;
-const ruleKey = (regulatorId, ruleId) => `${regulatorId}:${ruleId}`;
-const short = (text, n = 32) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
 
-// Impact Matrix: one row per trade, one Pass/Fail column per rule, then the overall status.
-// `report` is the JSON returned by POST /api/impact/check.
+// Impact Matrix: Trade_ID | one Pass/Fail column per selected regulator | Violations | Impact Explanation.
 export default function ComplianceMatrix({ report, onExport, exporting = false }) {
-  const rules = report.rules_checked;
+  const regulators = useMemo(() => {
+    const names = Object.fromEntries(report.summary.by_regulator.map((s) => [s.regulator_id, s.name]));
+    return report.regulators_checked.map((id) => ({ id, name: names[id] ?? id }));
+  }, [report]);
+
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
-  const [sort, setSort] = useState({ key: "row", dir: "asc" });
+  const [sortDir, setSortDir] = useState("asc"); // "asc" keeps the original file order
   const [page, setPage] = useState(0);
-  const [open, setOpen] = useState(null); // row_number of the expanded failed trade
-
-  // Pre-compute which rules each trade failed (so a cell lookup is instant).
-  const trades = useMemo(
-    () => report.results.map((r) => ({ ...r, failed: new Set(r.violations.map((v) => ruleKey(v.regulator_id, v.rule_id))) })),
-    [report],
-  );
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = trades.filter((t) => (status === "ALL" || t.status === status) && (!q || t.trade_id.toLowerCase().includes(q)));
-    const dir = sort.dir === "asc" ? 1 : -1;
-    const by = {
-      row: (a, b) => a.row_number - b.row_number,
-      trade: (a, b) => a.trade_id.localeCompare(b.trade_id, undefined, { numeric: true }),
-      status: (a, b) => a.status.localeCompare(b.status) || a.row_number - b.row_number, // FAIL sorts before PASS
-    }[sort.key];
-    return [...list].sort((a, b) => dir * by(a, b));
-  }, [trades, query, status, sort]);
+    const list = report.results.filter((t) => (status === "ALL" || t.status === status) && (!q || t.trade_id.toLowerCase().includes(q)));
+    return sortDir === "asc"
+      ? list
+      : [...list].sort((a, b) => b.trade_id.localeCompare(a.trade_id, undefined, { numeric: true }));
+  }, [report, query, status, sortDir]);
 
   const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const current = Math.min(page, pageCount - 1);
   const rows = visible.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
   const from = visible.length ? current * PAGE_SIZE + 1 : 0;
-
-  const toggleSort = (key) => {
-    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
-    setPage(0);
-  };
-  const sortIcon = (k) => (sort.key === k ? (sort.dir === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : null);
+  const columnCount = regulators.length + 3;
 
   return (
     <>
@@ -65,62 +50,45 @@ export default function ComplianceMatrix({ report, onExport, exporting = false }
         <table className="table">
           <thead>
             <tr>
-              <th className="mx-sort" onClick={() => toggleSort("trade")}>Trade{sortIcon("trade")}</th>
-              {rules.map((r) => (
-                <th key={ruleKey(r.regulator_id, r.rule_id)} className="mx-rule-head" title={`${r.regulator_id} · ${r.description}`}>
-                  {r.rule_id}: {short(r.description)}
-                </th>
-              ))}
-              <th className="mx-sort" onClick={() => toggleSort("status")}>Overall{sortIcon("status")}</th>
+              <th className="mx-sort" onClick={() => { setSortDir(sortDir === "asc" ? "desc" : "asc"); setPage(0); }}>
+                Trade_ID{sortDir === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </th>
+              {regulators.map((r) => <th key={r.id}>{r.name}</th>)}
+              <th>Violations</th>
+              <th>Impact Explanation</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((t) => {
-              const failed = t.status === "FAIL";
-              const isOpen = open === t.row_number;
-              return (
-                <Fragment key={t.row_number}>
-                  <tr className={`mx-row${failed ? " clickable" : ""}`} onClick={() => failed && setOpen(isOpen ? null : t.row_number)}>
-                    <td className="mx-trade">
-                      {failed ? (isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : <span className="mx-spacer" />}
-                      {t.trade_id}
-                    </td>
-                    {rules.map((r) => {
-                      const bad = t.failed.has(ruleKey(r.regulator_id, r.rule_id));
-                      return <td key={ruleKey(r.regulator_id, r.rule_id)} className={`mx-cell${bad ? " fail" : ""}`}>{bad ? "Fail" : "Pass"}</td>;
-                    })}
-                    <td><span className={`pill mx-pill ${failed ? "red" : "green"}`}>{t.status}</span></td>
-                  </tr>
-                  {isOpen && (
-                    <tr className="mx-detail">
-                      <td colSpan={rules.length + 2}>
-                        <ul>
-                          {t.violations.map((v) => (
-                            <li key={ruleKey(v.regulator_id, v.rule_id)}>
-                              <div><strong>{v.rule_id}</strong> <span className="sub">({v.regulator}) · {v.description}</span></div>
-                              <div className="why">{v.explanation}</div>
-                              <div className="sub">
-                                {v.impact}
-                                {Object.keys(v.evidence).length > 0 && (
-                                  <> · Values checked: {Object.entries(v.evidence).map(([k, val]) => `${k} = ${val ?? "empty"}`).join(", ")}</>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-            {!rows.length && <tr><td colSpan={rules.length + 2} className="muted">No trades match.</td></tr>}
+            {rows.map((t) => (
+              <tr key={t.row_number} className="mx-row">
+                <td className="mx-trade">{t.trade_id}</td>
+                {regulators.map((r) => {
+                  const bad = t.regulator_status[r.id] !== "PASS";
+                  return <td key={r.id} className={`mx-cell${bad ? " fail" : ""}`}>{bad ? "Fail" : "Pass"}</td>;
+                })}
+                <td className="mx-violations">
+                  {t.violations.length
+                    ? t.violations.map((v) => (
+                        <span key={`${v.regulator_id}:${v.rule_id}`} className="pill red mx-rule-pill" title={`${v.regulator} · ${v.description}`}>{v.rule_id}</span>
+                      ))
+                    : <span className="muted">—</span>}
+                </td>
+                <td className="mx-explain">
+                  {t.violations.length
+                    ? t.violations.map((v) => (
+                        <p key={`${v.regulator_id}:${v.rule_id}`}><strong>{v.rule_id}:</strong> {v.explanation}</p>
+                      ))
+                    : <span className="muted">—</span>}
+                </td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={columnCount} className="muted">No trades match.</td></tr>}
           </tbody>
         </table>
       </div>
 
       <div className="mx-pager">
-        <span>Showing {from}–{Math.min((current + 1) * PAGE_SIZE, visible.length)} of {visible.length} trades · click a failed row to see why</span>
+        <span>Showing {from}–{Math.min((current + 1) * PAGE_SIZE, visible.length)} of {visible.length} trades</span>
         <div className="mx-pager-btns">
           <button className="btn ghost" disabled={current === 0} onClick={() => setPage(current - 1)}>Previous</button>
           <span>Page {current + 1} / {pageCount}</span>
