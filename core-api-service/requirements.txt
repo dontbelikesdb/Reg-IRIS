@@ -1,0 +1,14 @@
+﻿fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+elasticsearch
+chromadb
+sentence-transformers
+json-logic-py
+pandas
+sqlalchemy
+psycopg2-binary
+python-multipart
+httpx
+pytest
