@@ -1,10 +1,12 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.api.v1.router import api_router
 
 app = FastAPI(
-    title="Reg IRIS - Core Regulatory & Impact API",
-    description="Regulatory search, JSON-driven compliance rule evaluation, and trade impact analysis.",
-    version="1.0.0",
+    title=settings.PROJECT_NAME,
+    description="Regulatory Search & Retrieval Microservice with Hybrid BM25/Vector search, bitemporal filtering, and grounded citations.",
+    version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -17,6 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy", "service": "core-api-service"}
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+@app.get("/health", tags=["Health Check"])
+def health():
+    return {
+        "status": "healthy",
+        "service": "search-retrieval-service",
+        "version": settings.VERSION
+    }

@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # -------------------------------------------------------------
+  # 1. PostgreSQL (Metadata, Versions & Lineage Store)
+  # -------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: regiris-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: regiris_db
+      POSTGRES_USER: regiris_user
+      POSTGRES_PASSWORD: regiris_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U regiris_user -d regiris_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - regiris-net
+
+  # -------------------------------------------------------------
+  # 2. Elasticsearch (Full-Text Search & Multi-field Facets)
+  # -------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: regiris-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - regiris-net
+
+  # -------------------------------------------------------------
+  # 3. ChromaDB (Vector Store for Dense Semantic Embeddings)
+  # -------------------------------------------------------------
+  chroma:
+    image: chromadb/chroma:0.4.24
+    container_name: regiris-chroma
+    restart: unless-stopped
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    ports:
+      - "8002:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+    networks:
+      - regiris-net
+
+  # -------------------------------------------------------------
+  # 4. Ingestion Service (Java Spring Boot 3.x - Ingestion & Diff)
+  # -------------------------------------------------------------
+  ingestion-service:
+    build:
+      context: ./ingestion-service
+      dockerfile: Dockerfile
+    container_name: regiris-ingestion
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/regiris_db
+      - SPRING_DATASOURCE_USERNAME=regiris_user
+      - SPRING_DATASOURCE_PASSWORD=regiris_password
+      - ELASTICSEARCH_URIS=http://elasticsearch:9200
+      - FASTAPI_INTERNAL_URL=http://core-api-service:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - regiris-net
+
+  # -------------------------------------------------------------
+  # 5. Core API Service (Python FastAPI - Rules, Impact & Search)
+  # -------------------------------------------------------------
+  core-api-service:
+    build:
+      context: ./core-api-service
+      dockerfile: Dockerfile
+    container_name: regiris-core-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://regiris_user:regiris_password@postgres:5432/regiris_db
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data:ro   # Mounts sample_trades.csv, rules.json & regulations as read-only
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+    networks:
+      - regiris-net
+
+  # -------------------------------------------------------------
+  # 6. Frontend Dashboard (React + Vite / Nginx)
+  # -------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: regiris-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - core-api-service
+      - ingestion-service
+    networks:
+      - regiris-net
+
+volumes:
+  pgdata:
+  esdata:
+  chromadata:
+
+networks:
+  regiris-net:
+    driver: bridge
