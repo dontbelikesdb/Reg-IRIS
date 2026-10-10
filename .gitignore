@@ -104,3 +104,8 @@ data/temp/
 temp/
 tmp/
 *.log
+
+
+api-gateway/
+├── ngnix.conf                  # Your existing file (ideally rename to nginx.conf)
+└── default.conf.template       # Gateway routing configuration
